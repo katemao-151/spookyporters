@@ -4,16 +4,17 @@ import numpy as np
 import math
 
 class bb84:
+    #Based (heavily) off https://quantum-computing.ibm.com/jupyter/user/qiskit-textbook/content/ch-algorithms/quantum-key-distribution.ipynb
     #TODO - maybe seperate classes into bob and alice
 
     def __init__(self, n):
-        #self.qc = device
+        #initialise class with number of qubits, error and loss rates and arrays to store future information
         self.n = n
 
-        self.e_t = 0
-        self.e_m = 0
+        self.e_t = 0 #error in transmission - the probability that a qubit will flip will being carried
+        self.e_m = 0 #error in measurement - the probability that a qubit will be measured incorrectly
 
-        self.p = 0.1
+        self.p = 0.1 #loss - the probability that a qubit won't make it to the other end 
 
         self.alice_bits = []
         self.alice_bases = []
@@ -23,77 +24,96 @@ class bb84:
 
 
     def run_protocol(self, distance):
-        #alice_bits = randint(2, size=self.n)
-        #alice_bases = randint(2, size=self.n)
+        """
+        Different bases work as follows:
+
+        In the z basis:
+
+        0 => |0>
+        1 => |1>
+
+        In the x basis:
+
+        0 => |+>  (= 1/root(2) |0> + |1>)
+        1 => |->  (= 1/root(2) |0> - |1>)
+
+        Measuring |+> or |-> in the z basis will give 0 with 0.5 probability and 1 with 0.5 probability
+
+        Measuring |0> or |1> in the x basis will give 0 with 0.5 probability and ...
+        """
 
         n_sent = 0
         n_received = 0
 
         while n_received < self.n:          #alice prepares random bits in random bases and sends them to bob
             qc = QuantumCircuit(1,1)
-            alice_bit = random.choice("01")
-            self.alice_bits.append(alice_bit)
-            alice_base = random.choice("zx") #TODO: could make user choice?
+            alice_bit = random.choice("01") #she chooses a random value
+            self.alice_bits.append(alice_bit) 
+            alice_base = random.choice("zx") #and chooses a random base
             self.alice_bases.append(alice_base)
             if alice_base == "z": # Prepare qubit in Z-basis
                 if alice_bit == "0":
-                    pass 
+                    pass #creates the |0> state
                 else:
-                    qc.x(0)
+                    qc.x(0) #creates the |1> state
             else: # Prepare qubit in X-basis
                 if alice_bit == "0":
-                    qc.h(0)
+                    qc.h(0) #creates the |+> state
                 else:
                     qc.x(0)
-                    qc.h(0)
+                    qc.h(0) #creates the |-> state
             n_sent += 1
             print("sent:", n_sent)
-            n_received += self.send(qc, loss=min(self.p * math.exp(distance-1), 1)) #loss scales exponentially with distance
-            print("received:", n_received)
+            n_received += self.send(qc, loss=min(self.p * math.exp(distance-1), 1)) #attempts to send qubit to bob. The greater the distance 
+            print("received:", n_received)                                          #between the two, the (exponentially) more likely the qubit will be lost
 
-        print("Alice: 'my bases were\t", self.alice_bases, "'")
-        print("Bob: 'my bases were\t", self.bob_bases, "'")
-        key_indexes = input("What are the indexes of the ones that were the same?").split() #maybe add a check?
+        print("Alice: 'my bases were\t", self.alice_bases, "'") #alice publishes her bases
+        print("Bob: 'my bases were\t", self.bob_bases, "'") #bob publishes his bases
+        key_indexes = input("What are the indexes of the ones that were the same?").split() #the user finds which were the same
+        while any(self.alice_bases[int(i)] != self.bob_bases[int(i)] for i in key_indexes): #if they're wrong, make them do it again until they get it
+            print("nope you're wrong")
+            key_indexes = input("What are the indexes of the ones that were the same?").split() #the user finds which were the same
+
         #key = [self.alice_bases[i] for i in range(self.n) if str(i) in key_indexes]
-        new_a_bits = [self.alice_bits[i] for i in range(self.n) if str(i) in key_indexes]
-        new_b_bits = [self.bob_bits[i] for i in range(self.n) if str(i) in key_indexes]
+        new_a_bits = [self.alice_bits[i] for i in range(self.n) if str(i) in key_indexes] #alice retains only the bits which are in the same basis as bob
+        new_b_bits = [self.bob_bits[i] for i in range(self.n) if str(i) in key_indexes] #same^
 
 
 
 
-        k = int(input("how much of your key do you want to publish to check with Bob?"))
+        k = int(input("how much of your key do you want to publish to check with Bob?")) #the user decides how much of the key to verify
         print("Alice: 'here are my first", k, " bits:\t", new_a_bits[:k], "'")
-        print("Bob: 'ok, here are mine:\t", new_b_bits[:k])
+        print("Bob: 'ok, here are mine:\t", new_b_bits[:k]) #they each publish the first k of their bits
 
         if "y" not in input("do they match"):
             print("then we have failed")
         else:
             print("success! We shall use the rest of our bits as our secret key!!")
-            key = new_a_bits[k:]
+            key = new_a_bits[k:] #a key has been formed
 
 
     def send(self, qc, loss=0.1):
-        if random.random() < self.e_t: 
+        if random.random() < self.e_t: #flips the qubit with probability e_t
             qc.x(0)
             qc.z(0)
             print("qubit was contaminated")
 
-        if random.random() > loss:
+        if random.random() > loss: #measures the qubit with probability 1 - loss
             self.b_measure(qc)
             return 1
         else:
-            self.bob_bases.append(-1)
+            self.bob_bases.append(-1) #adds -1 to show qubit was not successful
             self.bob_bits.append(-1)
             return 0 # qubit didnt make the journey
 
     def b_measure(self, qc):
-        bob_base = random.choice("zx")
+        bob_base = random.choice("zx") #bob picks a random basis to measure his qubit
         self.bob_bases.append(bob_base)
-        if bob_base == 'x': qc.h(0)
+        if bob_base == 'x': qc.h(0) #coverts to x basis: H|+> = |0>, H|+> = |1> (and vice versa)
         qc.measure(0,0)
         counts = simulate(qc, shots=1)
         result = '1' in counts
-        if random.random() < self.e_m: result = not(result)
-        self.bob_bits.append(int(result))
+        if random.random() < self.e_m: result = not(result) #does the wrong measurement with probability e_m
+        self.bob_bits.append(int(result)) #stores the result
 
 
