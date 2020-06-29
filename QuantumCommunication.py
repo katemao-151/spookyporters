@@ -94,7 +94,7 @@ def game_Sender():
 
 
         pygame.display.update()
-        clock.tick(1500)
+        clock.tick(15)
 
 def quitgame():
     pygame.quit()

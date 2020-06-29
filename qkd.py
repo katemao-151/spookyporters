@@ -7,14 +7,14 @@ class bb84:
     #Based (heavily) off https://quantum-computing.ibm.com/jupyter/user/qiskit-textbook/content/ch-algorithms/quantum-key-distribution.ipynb
     #TODO - maybe seperate classes into bob and alice
 
-    def __init__(self, n):
+    def __init__(self, n, e_t=0, e_m=0, p=0.1):
         #initialise class with number of qubits, error and loss rates and arrays to store future information
         self.n = n
 
-        self.e_t = 0 #error in transmission - the probability that a qubit will flip will being carried
-        self.e_m = 0 #error in measurement - the probability that a qubit will be measured incorrectly
+        self.e_t = e_t #error in transmission - the probability that a qubit will flip will being carried
+        self.e_m = e_m #error in measurement - the probability that a qubit will be measured incorrectly
 
-        self.p = 0.1 #loss - the probability that a qubit won't make it to the other end 
+        self.p = p #loss - the probability that a qubit won't make it to the other end 
 
         self.alice_bits = []
         self.alice_bases = []
@@ -89,7 +89,7 @@ class bb84:
             print("then we have failed")
         else:
             print("success! We shall use the rest of our bits as our secret key!!")
-            key = new_a_bits[k:] #a key has been formed
+            key = new_a_bits[k:] #a key has been formed     
 
 
     def send(self, qc, loss=0.1):
