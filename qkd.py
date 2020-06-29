@@ -64,7 +64,7 @@ class bb84:
                     qc.h(0) #creates the |-> state
             n_sent += 1
             print("sent:", n_sent)
-            n_received += self.send(qc, loss=min(self.p * math.exp(distance-1)/2, 1)) #attempts to send qubit to bob. The greater the distance 
+            n_received += self.send(qc, loss=calc_loss(self.p, distance)) #attempts to send qubit to bob. The greater the distance 
             print("received:", n_received)                                          #between the two, the (exponentially) more likely the qubit will be lost
         self.n_received, self.n_sent = n_received, n_sent
         print("Alice: 'my bases were\t", self.alice_bases, "'") #alice publishes her bases
@@ -95,7 +95,8 @@ class bb84:
             print("then we have failed")
         else:
             print("success! We shall use the rest of our bits as our secret key!!")
-            key = new_a_bits[k:] #a key has been formed     
+            key = "".join(new_a_bits[k:]) #a key has been formed     
+        self.key = key
 
 
     def send(self, qc, loss=0.1):
@@ -121,5 +122,11 @@ class bb84:
         result = '1' in counts
         if random.random() < self.e_m: result = not(result) #does the wrong measurement with probability e_m
         self.bob_bits.append(int(result)) #stores the result
+
+    def get_key(self):
+        return self.key
+
+def calc_loss(p, distance):
+    return min(p * math.exp((distance-1) * 0.5), 1)
 
 

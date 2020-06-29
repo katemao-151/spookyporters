@@ -21,9 +21,12 @@ dark_green = (0,255,0)
 dark_red = (255,0,0)
 grey = (220,220,220)
 purple = (128,0,128)
+light_red = (255, 102, 102)
 
 computers = {}
 repeaters = {}
+
+connections = {}
 
 n = ""
 
@@ -82,7 +85,7 @@ def show_tutorial():
 		pygame.display.update()
 		clock.tick(15)
 
-def draw_grid(top_left, width, height): # 0 gamewidth 2/3 gamewidth
+def draw_grid(top_left=(0,0), width=display_width, height=int(display_height * 2/3)): # 0 gamewidth 2/3 gamewidth 
 	#print(top_left, width, height)
 	#print(repeaters)
 	blockSize = 50 #Set the size of the grid block
@@ -145,11 +148,13 @@ def main_loop():
 
 def add():
 
-  pygame.mouse.set_cursor(*pygame.cursors.broken_x)
-  nearest_grid = choice_selection("Choose a grid to place your new repeater", (display_width*2/3, display_height*5/6))
-
   pygame.mouse.set_cursor(*pygame.cursors.tri_left)
-  from_grid = choice_selection("Where do you want the connection to come from", (display_width*2/3, display_height*5/6), is_repeater=len(repeaters))
+  from_grid = choice_selection("Where do you want the connection to come from", (display_width*2/3, display_height*5/6))
+
+
+  pygame.mouse.set_cursor(*pygame.cursors.broken_x)
+  nearest_grid = choice_selection("Choose a grid to place your new repeater", (display_width*2/3, display_height*5/6), measure_distance_from=from_grid)
+
 
 	#smallText = pygame.font.Font("freesansbold.ttf", 12)
 	#textSurf, textRect = text_objects("Choose a grid to place your new repeater", smallText)
@@ -167,12 +172,14 @@ def add():
   #main_loop()
 
 
-def choice_selection(message, position, is_repeater=True):
+def choice_selection(message, position, is_repeater=True, measure_distance_from=None):
   clearUI()
   smallText = pygame.font.Font("freesansbold.ttf", 12)
   textSurf, textRect = text_objects(message, smallText)
   textRect.center = position
   gameDisplay.blit(textSurf, textRect)
+
+  remove_next = None
 
   while True:
     for event in pygame.event.get():
@@ -182,7 +189,7 @@ def choice_selection(message, position, is_repeater=True):
       if event.type == pygame.MOUSEBUTTONUP:
         pos = pygame.mouse.get_pos()
         if pos[1] < display_height * 2/3:
-          grid_block = (pos[0] - (pos[0]% 50), pos[1]- (pos[1] % 50))
+          grid_block = (pos[0] - (pos[0]% 50), pos[1] - (pos[1] % 50))
           if is_repeater:
             if grid_block in repeaters:
               del repeaters[grid_block]
@@ -194,8 +201,33 @@ def choice_selection(message, position, is_repeater=True):
             if grid_block not in computers: print("choice must be in a computer", 1/0)
           return grid_block
 
+    if measure_distance_from:
+      gameDisplay.fill(pygame.Color("white"), (position[0]-100, position[1] + 25, 200, 50))
+      pos = pygame.mouse.get_pos()
+      nearest = (pos[0] - (pos[0]% 50), pos[1] - (pos[1] % 50))
+      dist =  math.sqrt( ((measure_distance_from[0] - nearest[0])/50)**2 +((measure_distance_from[1] - nearest[1])/50)**2)
+      loss = qkd.calc_loss(0.1, dist)
+      label = "Distance: " + str(round(dist, 3)) + "=> loss: " + str(round(loss,3))
+      colour = [(1-loss) * green[j] + loss * red[j] for j in range(3)]
+      textSurf, textRect = text_objects(label, smallText, colour=colour)
+      textRect.center = (position[0], position[1] + 50)
+      gameDisplay.blit(textSurf, textRect)
+
+      if remove_next and nearest != remove_next:
+        print("here", remove_next)
+        rect = pygame.Rect(remove_next[0], remove_next[1], 50, 50)
+        pygame.draw.rect(gameDisplay, white, rect, 0)
+        pygame.draw.rect(gameDisplay, grey, rect, 1)
+        remove_next = None
+
+
+      if nearest not in computers or nearest not in repeaters:
+        rect = pygame.Rect(nearest[0], nearest[1], 50, 50)
+        pygame.draw.rect(gameDisplay, light_red, rect, 0)
+        remove_next = nearest
+
     pygame.display.update()
-    clock.tick(15)
+    clock.tick(30)
     
       
 
@@ -234,7 +266,13 @@ def create_key(a, b):
       repeaters[b] = green
       #time.sleep(5)
       draw_grid()
-      input("whats next chief")
+      connections[q.get_key()] = (a, b)
+      textSurf, textRect = text_objects("Keys : \n" + q.get_key(), smallText)
+      textRect.center = (display_width*3/4, display_height*5/6)
+      gameDisplay.blit(textSurf, textRect)
+
+      print("added the text ting", textRect.center)
+      main_loop()
     except:
       if len(n) > 0:
         textSurf, textRect = text_objects("Invalid input", smallText, colour=red)
@@ -266,8 +304,7 @@ def draw_lines(red_lines, green_lines, a, b):
       if event.type == pygame.QUIT:
         quitgame()
 
-    print(a)
-    print(b[0]-a[0], b[1]-a[1])
+
     gameDisplay.fill(pygame.Color("white"), (a[0], a[1], b[0]-a[0], b[1]-a[1] + 50))
     if green_remaining > 0 and random.random() > red_remaining/green_remaining:
       #draw a green line
@@ -283,19 +320,19 @@ def draw_lines(red_lines, green_lines, a, b):
       coords = ((a[0], a[1] + sep1), (b[0], b[1] + sep2))
       drawn_lines["red"].insert(0, coords)
       red_remaining -= 1
-    else:
-      drawn_lines["red"].insert(0, ((0,0),(0,0)))
     
-    drawn_lines["red"] = drawn_lines["red"][:red_lines+green_lines]
+    drawn_lines["red"].insert(0, ((0,0),(0,0)))
     
-    print("drawing ", len(drawn_lines["green"]), " green lines")
+    drawn_lines["red"] = drawn_lines["red"][:red_lines + green_lines]
+    
+    #print("drawing ", len(drawn_lines["green"]), " green lines")
     for fr, to in drawn_lines["green"]:
-      pygame.draw.line(gameDisplay, green, fr, to)
+      pygame.draw.line(gameDisplay, green, fr, to, 2)
     for i, (fr, to) in enumerate(drawn_lines["red"]):
       if (fr, to) != (0,0): 
         c = (i+1)/len(drawn_lines["red"]) * 255
         new_col = [min(j + c, 255) for j in red]
-        print("drawing red with colour", new_col)
+        #print("drawing red with colour", new_col)
         pygame.draw.line(gameDisplay, red + (i/len(drawn_lines["red"]), ), fr, to)
       
     pygame.display.update()
