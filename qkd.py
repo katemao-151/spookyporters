@@ -23,7 +23,7 @@ class bb84:
         self.bob_bits = []
 
 
-    def run_protocol(self, distance):
+    def run_protocol(self, distance, user_input=False):
         """
         Different bases work as follows:
 
@@ -64,28 +64,34 @@ class bb84:
                     qc.h(0) #creates the |-> state
             n_sent += 1
             print("sent:", n_sent)
-            n_received += self.send(qc, loss=min(self.p * math.exp(distance-1), 1)) #attempts to send qubit to bob. The greater the distance 
+            n_received += self.send(qc, loss=min(self.p * math.exp(distance-1)/2, 1)) #attempts to send qubit to bob. The greater the distance 
             print("received:", n_received)                                          #between the two, the (exponentially) more likely the qubit will be lost
-
+        self.n_received, self.n_sent = n_received, n_sent
         print("Alice: 'my bases were\t", self.alice_bases, "'") #alice publishes her bases
         print("Bob: 'my bases were\t", self.bob_bases, "'") #bob publishes his bases
-        key_indexes = input("What are the indexes of the ones that were the same?").split() #the user finds which were the same
+        if not user_input:
+          key_indexes = [x for x in range(len(self.alice_bases)) if self.alice_bases[x]==self.bob_bases[x]]
+        else:
+          key_indexes = input("What are the indexes of the ones that were the same?").split() #the user finds which were the same
         while any(self.alice_bases[int(i)] != self.bob_bases[int(i)] for i in key_indexes): #if they're wrong, make them do it again until they get it
             print("nope you're wrong")
             key_indexes = input("What are the indexes of the ones that were the same?").split() #the user finds which were the same
 
         #key = [self.alice_bases[i] for i in range(self.n) if str(i) in key_indexes]
-        new_a_bits = [self.alice_bits[i] for i in range(self.n) if str(i) in key_indexes] #alice retains only the bits which are in the same basis as bob
-        new_b_bits = [self.bob_bits[i] for i in range(self.n) if str(i) in key_indexes] #same^
+        new_a_bits = [self.alice_bits[i] for i in range(self.n) if str(i) in key_indexes or i in key_indexes] #alice retains only the bits which are in the same basis as bob
+        new_b_bits = [self.bob_bits[i] for i in range(self.n) if str(i) in key_indexes or i in key_indexes] #same^
 
 
 
 
-        k = int(input("how much of your key do you want to publish to check with Bob?")) #the user decides how much of the key to verify
+        if user_input:
+          k = int(input("how much of your key do you want to publish to check with Bob?")) #the user decides how much of the key to verify
+        else:
+          k = self.n//4
         print("Alice: 'here are my first", k, " bits:\t", new_a_bits[:k], "'")
         print("Bob: 'ok, here are mine:\t", new_b_bits[:k]) #they each publish the first k of their bits
 
-        if "y" not in input("do they match"):
+        if user_input and "y" not in input("do they match"):
             print("then we have failed")
         else:
             print("success! We shall use the rest of our bits as our secret key!!")
