@@ -1,0 +1,2 @@
+language = "python3"
+run = "python level1_repeaters.py"
